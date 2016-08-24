@@ -1,0 +1,106 @@
+import webapp2, urllib2, sys, urllib, cookielib, json, time
+sys.path.append('libs')
+import mechanize
+from bs4 import BeautifulSoup
+from google.appengine.api import urlfetch, memcache
+from PIL import Image
+
+class MainHandler(webapp2.RequestHandler):
+    def get(self):
+        self.response.write('<center><h1>Welcome!</h1><h3>FacAdemics Test Portal App Engine Console/API</h3><br>(c)Prerit Kimtani And FacAdemics 2014</center>')
+
+class VersionDetail(webapp2.RequestHandler):
+    def get(self):
+        sub = {}
+        sub.update({'version': 'Test'})
+        sub.update({'detail': 'Working on prerithelp.net76.net/facademics_test'})
+        sub.update({'summary': 'Complete JSON Data'})
+        self.response.write(json.dumps(sub))
+
+class performLogin(webapp2.RequestHandler):
+    def get(self, facid, passwd):
+        br = mechanize.Browser()
+        cj = cookielib.CookieJar()
+        br.set_cookiejar(cj)
+        br.set_handle_equiv(True)
+        br.set_handle_redirect(True)
+        br.set_handle_referer(True)
+        br.set_handle_robots(False)
+        r = br.open('http://prerithelp.net76.net/facademics_test/homepage.php?msg=')
+        html = r.read()
+        soup = BeautifulSoup(html)
+        userCookieName = facid + "name"
+        userCookieValue = facid + "value"
+        for cook in cj:
+            if not memcache.get(userCookieName):
+                memcache.add(userCookieName, cook.name, 600)
+                memcache.add(userCookieValue, cook.value, 600)
+                
+            else:
+                memcache.set(userCookieName, cook.name)
+                memcache.set(userCookieValue, cook.value)
+        
+        self.response.headers['Content-Type'] = 'text/html'
+        br.select_form('login')
+        br.form['userId'] = facid
+        br.form['password'] = passwd
+        home = br.submit()
+        if(home.geturl() == 'http://prerithelp.net76.net/facademics_test/welcome_user.php'):
+            self.response.write('Success <br>'+ cook.name + ' ' + cook.value)
+        else:
+            self.response.write('Fail')
+
+class TimeTable(webapp2.RequestHandler):
+    def get(self, facid):
+        cj = cookielib.CookieJar()
+        userCookieName = facid + "name"
+        userCookieValue = facid + "value"
+        name= memcache.get(userCookieName)
+        value= memcache.get(userCookieValue)
+        br1 = mechanize.Browser()
+        br1.set_handle_equiv(True)
+        br1.set_handle_redirect(True)
+        br1.set_handle_referer(True)
+        ttUrl = br1.open('http://prerithelp.net76.net/facademics_test/welcome_user.php')
+        br1.set_handle_robots(False)
+        if (ttUrl.geturl() == "http://prerithelp.net76.net/facademics_test/welcome_user.php"):
+            self.response.write('Success <br>'+ name +' '+value)
+        else:
+            self.response.write('fail <br>'+ name +' '+value)
+
+class TimeTable2(webapp2.RequestHandler):
+    def get(self, facid):
+        cookienamekey = facid + "name"
+        self.response.headers['Access-Control-Allow-Origin'] = '*'
+        cookievaluekey = facid + "value"
+        if not memcache.get(cookienamekey):            
+            self.response.write("Timed Out")
+        else:
+            thevalue = memcache.get(cookievaluekey)
+            thecookiename = memcache.get(cookienamekey)
+            if (memcache.get(cookienamekey)):
+                br1 = mechanize.Browser()
+                ck = cookielib.Cookie(version=0, name=thecookiename, value=thevalue, port=None, port_specified=False,
+                                      domain='prerithelp.net76.net', domain_specified=False, domain_initial_dot=False,
+                                      path='/', path_specified=True, secure=True, expires=None, discard=True,
+                                      comment=None, comment_url=None, rest={'HttpOnly': None}, rfc2109=False)
+                newcj = cookielib.CookieJar()
+                newcj.set_cookie(ck)
+                br1.set_cookiejar(newcj)
+                br1.set_handle_equiv(True)
+                br1.set_handle_redirect(True)
+                br1.set_handle_referer(True)
+                ttUrl = br1.open('http://prerithelp.net76.net/facademics_test/welcome_user.php')
+                br1.set_handle_robots(False)
+                if (ttUrl.geturl() == "http://prerithelp.net76.net/facademics_test/welcome_user.php"):
+                    page = ttUrl.read()
+                    soup = BeautifulSoup(page)
+                    self.response.write('Success')
+                else:
+                	self.response.write('Fail')
+
+app = webapp2.WSGIApplication([
+    ('/', MainHandler), ('/versionDetail', VersionDetail),
+    ('/performLogin/(.*)/(.*)', performLogin),
+    ('/getTimeTable/(.*)', TimeTable),
+], debug=True)
